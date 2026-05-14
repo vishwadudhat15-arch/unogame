@@ -220,10 +220,12 @@ function drawCards(state, n) {
 
 function advanceTurn(state, skip = 1) {
   let cp = state.currentPlayer;
+  const np = state.players.length;
   for (let i = 0; i < skip; i++) {
-    cp = (cp + state.direction + state.players.length) % state.players.length;
+    cp = (cp + state.direction + np) % np;
   }
-  return { ...state, currentPlayer: cp, turnCounter: (state.turnCounter || 0) + 1 };
+  // Increment turnCounter by the number of turns advanced to signal UI/AI correctly
+  return { ...state, currentPlayer: cp, turnCounter: (state.turnCounter || 0) + skip };
 }
 
 function doFlip(state) {
@@ -257,10 +259,11 @@ function applyCardEffect(state, card, playerIdx) {
     return { ...advanceTurn(state), message: "" };
   }
   if (card.type === "skip") {
-    return { ...advanceTurn(state, 2), message: `${state.players[next].name} was skipped!` };
+    const nm = state.players[next].name;
+    return { ...advanceTurn(state, 2), message: `${nm} was skipped! ⏭️` };
   }
   if (card.type === "skip_everyone") {
-    return { ...advanceTurn(state, np), message: "Everyone skipped! 💀" };
+    return { ...advanceTurn(state, np), message: "Everyone else was skipped! Your turn again! 💀" };
   }
   if (card.type === "reverse") {
     const newDir = state.direction * -1;
@@ -272,18 +275,20 @@ function applyCardEffect(state, card, playerIdx) {
     return { ...advanceTurn(s2, 1), message: "Direction reversed! ⇄" };
   }
   if (card.type === "draw_one") {
-    let s2 = advanceTurn(state);
-    const { cards, state: s3 } = drawCards(s2, 1);
-    const players = s3.players.map((p, i) => i === s3.currentPlayer ? { ...p, hand: [...p.hand, ...cards], saidUno: false } : p);
+    const s_victim = advanceTurn(state, 1);
+    const { cards, state: s_drawn } = drawCards(s_victim, 1);
+    const players = s_drawn.players.map((p, i) => i === s_drawn.currentPlayer ? { ...p, hand: [...p.hand, ...cards], saidUno: false } : p);
     const nm = state.players[next].name;
-    return { ...advanceTurn({ ...s3, players }), message: `${nm} drew 1 card! 😬` };
+    // Move to the player AFTER the victim
+    return { ...advanceTurn({ ...s_drawn, players }, 1), message: `${nm} drew 1 and was skipped! 😬` };
   }
   if (card.type === "draw_five") {
-    let s2 = advanceTurn(state);
-    const { cards, state: s3 } = drawCards(s2, 5);
-    const players = s3.players.map((p, i) => i === s3.currentPlayer ? { ...p, hand: [...p.hand, ...cards], saidUno: false } : p);
+    const s_victim = advanceTurn(state, 1);
+    const { cards, state: s_drawn } = drawCards(s_victim, 5);
+    const players = s_drawn.players.map((p, i) => i === s_drawn.currentPlayer ? { ...p, hand: [...p.hand, ...cards], saidUno: false } : p);
     const nm = state.players[next].name;
-    return { ...advanceTurn({ ...s3, players }), message: `${nm} drew 5 cards! 🔥` };
+    // Move to the player AFTER the victim
+    return { ...advanceTurn({ ...s_drawn, players }, 1), message: `${nm} drew 5 and was skipped! 🔥` };
   }
   if (card.type === "flip") {
     const flipped = doFlip(state);
