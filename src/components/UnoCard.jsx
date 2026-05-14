@@ -514,10 +514,10 @@ const UnoIcon = ({ type, value, size, cardColor, isWild, flipColorHex }) => {
 
 // ─── Card Component ───────────────────────────────────────────────────────────
 function UnoCard({ card, onClick, playable = true, size = "normal", faceDown = false, side = "light", chosenColor }) {
-  const w = size === "small" ? 45 : size === "normal" ? 60 : size === "large" ? 80 : size === "xlarge" ? 100 : 84;
-  const h = size === "small" ? 67 : size === "normal" ? 90 : size === "large" ? 120 : size === "xlarge" ? 150 : 126;
-  const fs = size === "small" ? 20 : size === "normal" ? 26 : size === "large" ? 36 : size === "xlarge" ? 46 : 40;
-  const br = size === "small" ? 6 : size === "normal" ? 8 : size === "large" ? 10 : 12;
+  const w = size === "small" ? 50 : size === "normal" ? 68 : size === "large" ? 90 : size === "xlarge" ? 115 : 84;
+  const h = size === "small" ? 75 : size === "normal" ? 102 : size === "large" ? 135 : size === "xlarge" ? 172 : 126;
+  const fs = size === "small" ? 22 : size === "normal" ? 30 : size === "large" ? 42 : size === "xlarge" ? 54 : 40;
+  const br = size === "small" ? 7 : size === "normal" ? 9 : size === "large" ? 12 : 14;
 
   const cardStyle = {
     width: w, height: h, flexShrink: 0,
@@ -854,15 +854,15 @@ export default function UnoFlip({ config, onHome }) {
   const isTablet = vw <= 768;
   const isLaptop = vw <= 1024;
   // Card size for player hand — shrink on tiny screens
-  const handCardSize = isMobile ? "small" : isTablet ? "normal" : "large";
+  const handCardSize = isMobile ? "normal" : isTablet ? "large" : "xlarge";
   // Card overlap in hand (negative left margin)
-  const handOverlap = isMobile ? -18 : isTablet ? -28 : -40;
+  const handOverlap = isMobile ? -22 : isTablet ? -36 : -52;
   // AI card size
-  const aiCardSize = isMobile ? "small" : "small";
+  const aiCardSize = isMobile ? "small" : "normal";
   // AI card overlap (vertical for left/right AIs)
-  const aiOverlap = isMobile ? -18 : -28;
+  const aiOverlap = isMobile ? -20 : -32;
   // UNO button size
-  const unoSize = isMobile ? 52 : isTablet ? 70 : 80;
+  const unoSize = isMobile ? 60 : isTablet ? 82 : 96;
 
   const top = gs.discardPile[gs.discardPile.length - 1] || null;
   const me = gs.players[0];
@@ -1582,7 +1582,7 @@ export default function UnoFlip({ config, onHome }) {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             {gs.players[1].hand.map((_, i) => {
               const backSide = gs.side === "light" ? "dark" : "light";
-              const aiOverlapValue = isMobile ? -18 : isTablet ? -28 : -32;
+              const aiOverlapValue = isMobile ? -18 - 17 : isTablet ? -28 : -57;
               return (
                 <div key={i} style={{ marginTop: i === 0 ? 0 : aiOverlapValue }}>
                   <div style={{ transform: "rotate(90deg)", transformOrigin: "center" }}>
@@ -1606,7 +1606,7 @@ export default function UnoFlip({ config, onHome }) {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             {gs.players[3].hand.map((_, i) => {
               const backSide = gs.side === "light" ? "dark" : "light";
-              const aiOverlapValue = isMobile ? -18 : isTablet ? -28 : -32;
+              const aiOverlapValue = isMobile ? -18 - 17 : isTablet ? -28 : -57;
               return (
                 <div key={i} style={{ marginTop: i === 0 ? 0 : aiOverlapValue }}>
                   <div style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}>
@@ -1781,7 +1781,7 @@ export default function UnoFlip({ config, onHome }) {
         </div>
 
         {/* Hand — scrollable on mobile */}
-        <div className="player-hand-scroll" style={{ justifyContent: "flex-start", maxWidth: isMobile ? "98vw" : isTablet ? "92vw" : "82vw" }}>
+        <div className="player-hand-scroll" style={{ justifyContent: "flex-start", maxWidth: isMobile ? "99vw" : isTablet ? "95vw" : "88vw" }}>
           {me.hand.map((card, i) => {
             const canPlayAny = isMyTurn && !drewCard && !justDrew;
             const isThisDrawn = drewCard && drewCard.id === card.id;

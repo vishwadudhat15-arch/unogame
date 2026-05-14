@@ -42,15 +42,15 @@ const App = () => {
             style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
           >
             <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 100 }}>
-              <button 
+              <button
                 onClick={quitGame}
-                className="btn btn-outline" 
+                className="btn btn-outline"
                 style={{ padding: '0.5rem', borderRadius: '50%', background: 'rgba(0,0,0,0.5)' }}
               >
                 <ArrowLeft size={20} />
               </button>
             </div>
-            
+
             {/* Render the actual UNO game */}
             <div style={{ flex: 1, overflow: 'auto' }}>
               <UnoFlip config={gameConfig} mode={gameMode} onHome={quitGame} />
