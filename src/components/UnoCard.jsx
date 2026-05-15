@@ -519,10 +519,10 @@ const UnoIcon = ({ type, value, size, cardColor, isWild, flipColorHex }) => {
 
 // ─── Card Component ───────────────────────────────────────────────────────────
 function UnoCard({ card, onClick, playable = true, size = "normal", faceDown = false, side = "light", chosenColor }) {
-  const w = size === "small" ? 50 : size === "normal" ? 68 : size === "large" ? 90 : size === "xlarge" ? 115 : 84;
-  const h = size === "small" ? 75 : size === "normal" ? 102 : size === "large" ? 135 : size === "xlarge" ? 172 : 126;
-  const fs = size === "small" ? 22 : size === "normal" ? 30 : size === "large" ? 42 : size === "xlarge" ? 54 : 40;
-  const br = size === "small" ? 7 : size === "normal" ? 9 : size === "large" ? 12 : 14;
+  const w = size === "small" ? 50 : size === "normal" ? 68 : size === "large" ? 90 : size === "xlarge" ? 115 : size === "xxlarge" ? 145 : 84;
+  const h = size === "small" ? 75 : size === "normal" ? 102 : size === "large" ? 135 : size === "xlarge" ? 172 : size === "xxlarge" ? 218 : 126;
+  const fs = size === "small" ? 22 : size === "normal" ? 30 : size === "large" ? 42 : size === "xlarge" ? 54 : size === "xxlarge" ? 68 : 40;
+  const br = size === "small" ? 7 : size === "normal" ? 9 : size === "large" ? 12 : size === "xlarge" ? 14 : 17;
 
   const cardStyle = {
     width: w, height: h, flexShrink: 0,
@@ -530,7 +530,7 @@ function UnoCard({ card, onClick, playable = true, size = "normal", faceDown = f
     boxSizing: "border-box",
     cursor: playable && onClick ? "pointer" : "not-allowed",
     opacity: 1,
-    transform: "translateY(0)",
+    transform: "translateY(0px)",
     transition: "transform 0.15s, box-shadow 0.15s",
     position: "relative", userSelect: "none",
     boxShadow: playable && onClick ? "0 4px 14px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3)" : "0 2px 6px rgba(0,0,0,0.3)",
@@ -849,6 +849,7 @@ export default function UnoFlip({ config, onHome }) {
   const [aiPenaltyAnim, setAiPenaltyAnim] = useState(null); // { playerIdx, count } for AI receiving penalty
   const aiTimerRef = useRef(null);
   const drawPileRef = useRef(null); // ref to get draw pile position
+  const handScrollRef = useRef(null); // ref to hand scroll container for auto-scroll
   const prevHumanHandLen = useRef(0); // tracks human hand size to detect penalty draws
   const voluntaryDrawRef = useRef(false); // true when player taps TAP TO DRAW (prevents double anim)
   const prevAllHandLens = useRef([]); // tracks ALL players' hand sizes to detect AI penalty draws
@@ -857,17 +858,21 @@ export default function UnoFlip({ config, onHome }) {
   // Responsive breakpoints
   const isMobile = vw <= 480;
   const isTablet = vw <= 768;
-  const isLaptop = vw <= 1024;
-  // Card size for player hand — shrink on tiny screens
-  const handCardSize = isMobile ? "normal" : isTablet ? "large" : "xlarge";
-  // Card overlap in hand (negative left margin)
-  const handOverlap = isMobile ? -22 : isTablet ? -36 : -52;
+  const isLaptop = vw <= 1366;
+  const isShortScreen = vh < 720;
+  const isDesktop = vw > 1366;
+
+  // Card size for player hand — mobile UNCHANGED, tablet/PC increased
+  const handCardSize = isMobile ? "small" : isTablet ? "normal" : isLaptop ? "large" : "xlarge";
+  // Card overlap — adjusted for larger cards on tablet/PC
+  // Positive overlap means cards are spaced out properly, negative means they overlap
+  const handOverlap = isMobile ? -10 : isTablet ? -8 : isLaptop ? -12 : -20;
   // AI card size
-  const aiCardSize = isMobile ? "small" : "normal";
+  const aiCardSize = isMobile ? "small" : (isTablet || isLaptop) ? "large" : "normal";
   // AI card overlap (vertical for left/right AIs)
-  const aiOverlap = isMobile ? -20 : -32;
+  const aiOverlap = isMobile ? -20 : (isTablet || isLaptop) ? -27 : -32;
   // UNO button size
-  const unoSize = isMobile ? 60 : isTablet ? 82 : 96;
+  const unoSize = isMobile ? 62 : isTablet ? 80 : isLaptop ? 88 : 104;
 
   const top = gs.discardPile[gs.discardPile.length - 1] || null;
   const me = gs.players[0];
@@ -1003,16 +1008,18 @@ export default function UnoFlip({ config, onHome }) {
             const playerCards = players[cp].hand.length;
             const dare = !matched && playerCards > 3 && Math.random() < 0.2;
             if (matched || dare) {
+              const nextPlayer = (cp + s.direction + s.players.length) % s.players.length;
               return {
                 ...s2, players,
                 needDrawColor: false, drawColorTarget: null,
                 chosenColor: matched ? drew.color : s.chosenColor,
                 message: dare ? `${s.players[cp].name} dared to stop! 😎` : `${s.players[cp].name} drew ${drew.display} — matched!`,
-                currentPlayer: (cp + s.direction + s.players.length) % s.players.length,
+                currentPlayer: nextPlayer,
                 turnCounter: (s.turnCounter || 0) + 1,
               };
             }
-            return { ...s2, players, message: `${s.players[cp].name} drew ${drew.display}...` };
+            // Still drawing — bump turnCounter so useEffect re-fires for next draw
+            return { ...s2, players, message: `${s.players[cp].name} drew ${drew.display}...`, turnCounter: (s.turnCounter || 0) + 1 };
           });
         }, 700);
         return () => clearTimeout(timer);
@@ -1051,12 +1058,39 @@ export default function UnoFlip({ config, onHome }) {
     const watchdog = setTimeout(() => {
       setGs(s => {
         if (!s.players[s.currentPlayer]?.isAI || s.roundOver || s.needColor || s.needDrawColor) return s;
-        // Force-advance the stuck AI player
         return { ...advanceTurn(s), message: `${s.players[s.currentPlayer].name} timed out.` };
       });
     }, 4000);
     return () => clearTimeout(watchdog);
   }, [gs.currentPlayer, gs.turnCounter, gs.roundOver, gs.needColor, gs.needDrawColor, gs.pendingUno]);
+
+  // ── Freeze-breaker for needDrawColor: if AI stuck drawing for 6s, force stop ──
+  useEffect(() => {
+    if (gs.roundOver || !gs.needDrawColor) return;
+    if (!gs.players[gs.currentPlayer]?.isAI) return;
+    const cp = gs.currentPlayer;
+    const watchdog = setTimeout(() => {
+      setGs(s => {
+        if (!s.needDrawColor || s.currentPlayer !== cp) return s;
+        const nextPlayer = (cp + s.direction + s.players.length) % s.players.length;
+        return {
+          ...s,
+          needDrawColor: false, drawColorTarget: null,
+          currentPlayer: nextPlayer,
+          turnCounter: (s.turnCounter || 0) + 1,
+          message: `${s.players[cp].name} stopped drawing (timeout).`,
+        };
+      });
+    }, 6000);
+    return () => clearTimeout(watchdog);
+  }, [gs.currentPlayer, gs.turnCounter, gs.roundOver, gs.needDrawColor]);
+
+  // ── Auto-scroll hand to right when new cards are added (so newest card is visible) ──
+  useEffect(() => {
+    if (handScrollRef.current) {
+      handScrollRef.current.scrollTo({ left: handScrollRef.current.scrollWidth, behavior: 'smooth' });
+    }
+  }, [gs.players[0]?.hand?.length]);
 
   // ── Detect penalty cards given to human (draw_one, draw_five, wild_draw_two) ──
   useEffect(() => {
@@ -1146,15 +1180,27 @@ export default function UnoFlip({ config, onHome }) {
       if (canPlayIt) {
         setGs(newState);
         setDrewCard(drew);        // player can choose to play it
+        setJustDrew(false);
+        setDrawHandAnim(false);
+        setAnimCard(null);
+        isDrawingRef.current = false;
       } else {
-        // Not playable → advance turn automatically after showing the card
-        setGs({ ...advanceTurn(newState), message: "No playable card drawn. Turn passed." });
+        // Not playable → advance turn by exactly 1, never trigger drawn card's action effect.
+        // Reset all draw-related UI state BEFORE the gs update to avoid stale-state blocking player's next turn.
         setDrewCard(null);
+        setJustDrew(false);
+        setDrawHandAnim(false);
+        setAnimCard(null);
+        isDrawingRef.current = false;
+        setGs(s => ({
+          ...s,
+          drawPile: newState.drawPile,
+          players: newState.players,
+          currentPlayer: (s.currentPlayer + s.direction + s.players.length) % s.players.length,
+          turnCounter: (s.turnCounter || 0) + 1,
+          message: "No playable card drawn. Turn passed.",
+        }));
       }
-      setJustDrew(false);
-      setDrawHandAnim(false);
-      setAnimCard(null);
-      isDrawingRef.current = false; // Release lock
     }, 750);
   }
 
@@ -1185,12 +1231,12 @@ export default function UnoFlip({ config, onHome }) {
     setTimeout(() => {
       const matched = drew.color === gs.drawColorTarget;
       if (matched) {
-        // Got the color — turn ends, can optionally play it
-        const newState = { ...s2, players, needDrawColor: false, drawColorTarget: null, chosenColor: drew.color, message: `You drew ${drew.display} — it matches! You can play it or pass.` };
-        setGs(newState);
+        // Got the color — needDrawColor clears, offer to play it or pass
+        setGs({ ...s2, players, needDrawColor: false, drawColorTarget: null, chosenColor: drew.color, message: `You drew ${drew.display} — it matches! Play it or pass.` });
         setDrewCard(drew); // offer to play the matching card
+        setJustDrew(true);
       } else {
-        // Didn't get it — keep needDrawColor true
+        // Didn't match — keep drawing
         setGs({ ...s2, players, message: `Drew ${drew.display}, not ${COLOR_LABEL[gs.drawColorTarget]}. Keep drawing!` });
       }
       setDrawHandAnim(false);
@@ -1207,6 +1253,8 @@ export default function UnoFlip({ config, onHome }) {
       drawColorTarget: null,
       message: "You dared to stop! 😎 Turn passed."
     }));
+    setDrewCard(null);
+    setJustDrew(false);
   }
 
   function handleColorPick(color) {
@@ -1367,8 +1415,13 @@ export default function UnoFlip({ config, onHome }) {
           padding: 6px 4px 10px 4px;
           -webkit-overflow-scrolling: touch;
           scrollbar-width: none;
+          flex-direction: row;
+          justify-content: flex-start;
+          scroll-behavior: smooth;
         }
         .player-hand-scroll::-webkit-scrollbar { display: none; }
+        /* When cards overflow, first card is at left, last card at right — 
+           scrolling right reveals newer cards collected at the right end */
       `}</style>
 
       {/* ── Penalty card animations (draw_one / draw_five / wild_draw_two / wild_draw_color dealt to human) ── */}
@@ -1562,7 +1615,7 @@ export default function UnoFlip({ config, onHome }) {
         const topPlayer = gs.players[topIdx];
         if (!topPlayer) return null;
         const backSide = gs.side === "light" ? "dark" : "light";
-        const aiOverlapValue = isMobile ? -12 : isTablet ? -18 : -22;
+        const aiOverlapValue = isMobile ? -12 : (isTablet || isLaptop) ? -24 : -22;
         return (
           <div style={{ position: "absolute", top: isMobile ? "5%" : "4%", left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
             <div style={{ display: "flex", justifyContent: "center" }}>
@@ -1583,11 +1636,11 @@ export default function UnoFlip({ config, onHome }) {
 
       {/* Left Player (AI 1) - only for 3+ players */}
       {gs.players[2] && gs.players[1] && (
-        <div style={{ position: "absolute", left: isMobile ? "1%" : "2%", top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
+        <div style={{ position: "absolute", left: isMobile ? "1%" : "5%", top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             {gs.players[1].hand.map((_, i) => {
               const backSide = gs.side === "light" ? "dark" : "light";
-              const aiOverlapValue = isMobile ? -18 - 17 : isTablet ? -28 : -57;
+              const aiOverlapValue = isMobile ? -18 - 17 : (isTablet || isLaptop) ? -67 : -57;
               return (
                 <div key={i} style={{ marginTop: i === 0 ? 0 : aiOverlapValue }}>
                   <div style={{ transform: "rotate(90deg)", transformOrigin: "center" }}>
@@ -1607,11 +1660,11 @@ export default function UnoFlip({ config, onHome }) {
 
       {/* Right Player (AI 3 / Player 4) - only for 4 players */}
       {gs.players[3] && (
-        <div style={{ position: "absolute", right: isMobile ? "1%" : "2%", top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
+        <div style={{ position: "absolute", right: isMobile ? "1%" : "5%", top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             {gs.players[3].hand.map((_, i) => {
               const backSide = gs.side === "light" ? "dark" : "light";
-              const aiOverlapValue = isMobile ? -18 - 17 : isTablet ? -28 : -57;
+              const aiOverlapValue = isMobile ? -18 - 17 : (isTablet || isLaptop) ? -67 : -57;
               return (
                 <div key={i} style={{ marginTop: i === 0 ? 0 : aiOverlapValue }}>
                   <div style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}>
@@ -1632,7 +1685,7 @@ export default function UnoFlip({ config, onHome }) {
 
 
       {/* Center Table Area */}
-      <div style={{ position: "absolute", top: isMobile ? "46%" : isTablet ? "44%" : "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 10, display: "flex", alignItems: "center", gap: isMobile ? 10 : 20 }}>
+      <div style={{ position: "absolute", top: isMobile ? "46%" : (isTablet || isShortScreen) ? "42%" : "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 10, display: "flex", alignItems: "center", gap: isMobile ? 10 : 20 }}>
 
 
 
@@ -1770,14 +1823,14 @@ export default function UnoFlip({ config, onHome }) {
           </div>
         </div>
       )}
-      {/* Player 1 (User) */}
+      {/* Player 1 (User) — hand + UNO button in one bottom bar */}
       <div style={{
-        position: "absolute", bottom: isMobile ? 10 : 20, left: "50%", transform: "translateX(-50%)",
+        position: "absolute", bottom: isMobile ? 8 : 16, left: "50%", transform: "translateX(-50%)",
         display: "flex", flexDirection: "column", alignItems: "center", zIndex: 30,
         maxWidth: "98vw",
       }}>
-        {/* Player 1 Info */}
-        <div style={{ display: "flex", justifyContent: "center", width: "100%", marginBottom: isMobile ? 5 : 10, padding: "0 8px", color: "#fff", fontSize: isMobile ? 11 : 14, fontWeight: 700, letterSpacing: 1, borderBottom: "2px solid rgba(255,255,255,0.4)", paddingBottom: isMobile ? 4 : 8 }}>
+        {/* Player Info Row — name, turn badge, score */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%", marginBottom: isMobile ? 4 : 8, padding: "0 8px", color: "#fff", fontSize: isMobile ? 11 : 14, fontWeight: 700, letterSpacing: 1, borderBottom: "2px solid rgba(255,255,255,0.4)", paddingBottom: isMobile ? 3 : 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ background: "linear-gradient(135deg, #f39c12, #d35400)", color: "#fff", padding: "2px 10px", borderRadius: 8, fontWeight: 900, fontSize: isMobile ? 11 : 14, letterSpacing: 1, boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}>YOU</span>
             {gs.currentPlayer === 0 && <span style={{ fontSize: isMobile ? 8 : 10, background: "#FFD700", color: "#000", padding: "2px 6px", borderRadius: 6, fontWeight: 900 }}>YOUR TURN</span>}
@@ -1785,104 +1838,109 @@ export default function UnoFlip({ config, onHome }) {
           </div>
         </div>
 
-        {/* Hand — scrollable on mobile */}
-        <div className="player-hand-scroll" style={{ justifyContent: "flex-start", maxWidth: isMobile ? "99vw" : isTablet ? "95vw" : "88vw" }}>
-          {me.hand.map((card, i) => {
-            const canPlayAny = isMyTurn && !drewCard && !justDrew;
-            const isThisDrawn = drewCard && drewCard.id === card.id;
-            const playable = (canPlayAny || isThisDrawn) && canPlay(card, top, gs.chosenColor);
-            return (
-              <div key={card.id} style={{
-                marginLeft: i === 0 ? 0 : handOverlap,
-                transform: "translateY(0)", transition: "transform 0.2s",
-                flexShrink: 0,
-              }}
-                onMouseEnter={e => playable && (e.currentTarget.style.transform = "translateY(-12px)")}
-                onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}>
-                <UnoCard card={card} playable={playable} onClick={playable ? () => handlePlay(card.id) : undefined} size={handCardSize} chosenColor={card.id === top?.id ? gs.chosenColor : null} />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      {/* Call UNO Button (Bottom Right) */}
-      <div style={{ position: "absolute", bottom: isMobile ? 120 : 180, right: isMobile ? 8 : 20, zIndex: 40, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-        {(drewCard || justDrew) && isMyTurn && (
-          <button onClick={handlePassAfterDraw} style={{
-            padding: isMobile ? "5px 12px" : "8px 20px", borderRadius: "16px", background: "#e67e22",
-            border: "2px solid #fff", color: "#fff", fontWeight: 900, fontSize: isMobile ? "11px" : "13px",
-            cursor: "pointer", boxShadow: "0 5px 0 #a04000", transition: "transform 0.1s"
-          }}
-            onMouseDown={e => e.currentTarget.style.transform = "translateY(4px)"}
-            onMouseUp={e => e.currentTarget.style.transform = "translateY(0)"}
-          >PASS</button>
-        )}
-        <button
-          onClick={handleSayUno}
-          style={{
-            width: unoSize, height: unoSize, borderRadius: "50%",
-            background: gs.pendingUno === 0
-              ? "radial-gradient(circle at 30% 30%, #ff4b2b, #c0392b)"
-              : "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
-            border: gs.pendingUno === 0
-              ? `${isMobile ? 4 : 6}px solid #ffeb3b`
-              : `${isMobile ? 4 : 6}px solid #fff`,
-            boxShadow: gs.pendingUno === 0
-              ? "0 0 30px #ff4b2b, 0 10px 20px rgba(0,0,0,0.5)"
-              : "0 8px 16px rgba(0,0,0,0.3), inset 0 -6px 0 rgba(0,0,0,0.2)",
-            color: "#fff", fontWeight: 900,
-            cursor: "pointer", transition: "all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 0, userSelect: "none",
-            transformOrigin: "center",
-            animation: gs.pendingUno === 0 ? "pulse 0.4s infinite alternate" : "none",
-            opacity: ((me.hand.length === 2 || gs.pendingUno === 0) && !me.saidUno) ? 1 : 0.35,
-            pointerEvents: ((me.hand.length === 2 || gs.pendingUno === 0) && !me.saidUno) ? "auto" : "none",
-            overflow: "hidden",
-            position: "relative",
-          }}
-          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.15) rotate(5deg)"}
-          onMouseLeave={e => e.currentTarget.style.transform = "scale(1) rotate(0deg)"}
-          onMouseDown={e => e.currentTarget.style.transform = "scale(0.9)"}
-        >
-          {/* Skull image when pending or active */}
-          {(me.hand.length <= 2 || gs.pendingUno === 0) && !me.saidUno ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-              <img
-                src="denger.jpg"
-                alt="UNO"
-                style={{
-                  width: unoSize * 0.52, height: unoSize * 0.52,
-                  objectFit: "contain",
-                  filter: gs.pendingUno === 0
-                    ? "brightness(10) drop-shadow(0 0 4px #fff)"
-                    : "invert(1) drop-shadow(0 2px 3px rgba(0,0,0,0.5))",
+        {/* Hand row + UNO button side by side */}
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 14 }}>
+          {/* Hand — scrollable */}
+          <div ref={handScrollRef} className="player-hand-scroll" style={{ justifyContent: "flex-start", maxWidth: isMobile ? "75vw" : isTablet ? "72vw" : isLaptop ? "70vw" : "78vw" }}>
+            {me.hand.map((card, i) => {
+              const canPlayAny = isMyTurn && !drewCard && !justDrew;
+              const isThisDrawn = drewCard && drewCard.id === card.id;
+              const playable = (canPlayAny || isThisDrawn) && canPlay(card, top, gs.chosenColor);
+              return (
+                <div key={card.id} style={{
+                  marginLeft: i === 0 ? 0 : handOverlap,
+                  transform: "translateY(0)", transition: "transform 0.2s, z-index 0s",
+                  flexShrink: 0,
+                  position: "relative",
+                  zIndex: i,
                 }}
-                onError={e => { e.target.style.display = "none"; }}
-              />
-              <span style={{
-                fontSize: unoSize * 0.22, fontWeight: 900,
-                color: "#fff",
-                textShadow: "1px 1px 0 #000, 2px 2px 0 rgba(0,0,0,0.5)",
-                letterSpacing: "1px",
-                transform: "skewX(-5deg)",
-                lineHeight: 1,
-              }}>
-                {gs.pendingUno === 0 ? "UNO!" : "UNO"}
-              </span>
-            </div>
-          ) : (
-            <div style={{
-              fontSize: `clamp(18px, 3vh, 32px)`,
-              textShadow: "2px 2px 0 #000, 4px 4px 0 rgba(0,0,0,0.3)",
-              letterSpacing: "2px",
-              transform: "skewX(-5deg)",
-              color: "#fff",
-            }}>
-              UNO
-            </div>
-          )}
-        </button>
+                  onMouseEnter={e => { if (playable) { e.currentTarget.style.transform = "translateY(-12px)"; e.currentTarget.style.zIndex = 999; } }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.zIndex = i; }}>
+                  <UnoCard card={card} playable={playable} onClick={playable ? () => handlePlay(card.id) : undefined} size={handCardSize} chosenColor={card.id === top?.id ? gs.chosenColor : null} />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* UNO Button + PASS — stacked to the right of the hand */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            {(drewCard || justDrew) && isMyTurn && (
+              <button onClick={handlePassAfterDraw} style={{
+                padding: isMobile ? "5px 10px" : "7px 16px", borderRadius: "14px", background: "#e67e22",
+                border: "2px solid #fff", color: "#fff", fontWeight: 900, fontSize: isMobile ? "10px" : "12px",
+                cursor: "pointer", boxShadow: "0 4px 0 #a04000", transition: "transform 0.1s", whiteSpace: "nowrap",
+              }}
+                onMouseDown={e => e.currentTarget.style.transform = "translateY(3px)"}
+                onMouseUp={e => e.currentTarget.style.transform = "translateY(0)"}
+              >PASS</button>
+            )}
+            <button
+              onClick={handleSayUno}
+              style={{
+                width: unoSize, height: unoSize, borderRadius: "50%",
+                background: gs.pendingUno === 0
+                  ? "radial-gradient(circle at 30% 30%, #ff4b2b, #c0392b)"
+                  : "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+                border: gs.pendingUno === 0
+                  ? `${isMobile ? 4 : 6}px solid #ffeb3b`
+                  : `${isMobile ? 4 : 6}px solid #fff`,
+                boxShadow: gs.pendingUno === 0
+                  ? "0 0 30px #ff4b2b, 0 10px 20px rgba(0,0,0,0.5)"
+                  : "0 8px 16px rgba(0,0,0,0.3), inset 0 -6px 0 rgba(0,0,0,0.2)",
+                color: "#fff", fontWeight: 900,
+                cursor: "pointer", transition: "all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                padding: 0, userSelect: "none",
+                transformOrigin: "center",
+                animation: gs.pendingUno === 0 ? "pulse 0.4s infinite alternate" : "none",
+                opacity: ((me.hand.length === 2 || gs.pendingUno === 0) && !me.saidUno) ? 1 : 0.35,
+                pointerEvents: ((me.hand.length === 2 || gs.pendingUno === 0) && !me.saidUno) ? "auto" : "none",
+                overflow: "hidden",
+                position: "relative",
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.15) rotate(5deg)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "scale(1) rotate(0deg)"}
+              onMouseDown={e => e.currentTarget.style.transform = "scale(0.9)"}
+            >
+              {(me.hand.length <= 2 || gs.pendingUno === 0) && !me.saidUno ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+                  <img
+                    src="denger.jpg"
+                    alt="UNO"
+                    style={{
+                      width: unoSize * 0.52, height: unoSize * 0.52,
+                      objectFit: "contain",
+                      filter: gs.pendingUno === 0
+                        ? "brightness(10) drop-shadow(0 0 4px #fff)"
+                        : "invert(1) drop-shadow(0 2px 3px rgba(0,0,0,0.5))",
+                    }}
+                    onError={e => { e.target.style.display = "none"; }}
+                  />
+                  <span style={{
+                    fontSize: unoSize * 0.22, fontWeight: 900,
+                    color: "#fff",
+                    textShadow: "1px 1px 0 #000, 2px 2px 0 rgba(0,0,0,0.5)",
+                    letterSpacing: "1px",
+                    transform: "skewX(-5deg)",
+                    lineHeight: 1,
+                  }}>
+                    {gs.pendingUno === 0 ? "UNO!" : "UNO"}
+                  </span>
+                </div>
+              ) : (
+                <div style={{
+                  fontSize: `clamp(18px, 3vh, 32px)`,
+                  textShadow: "2px 2px 0 #000, 4px 4px 0 rgba(0,0,0,0.3)",
+                  letterSpacing: "2px",
+                  transform: "skewX(-5deg)",
+                  color: "#fff",
+                }}>
+                  UNO
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Round Over Modal */}
