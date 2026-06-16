@@ -857,22 +857,52 @@ export default function UnoFlip({ config, onHome }) {
   const { w: vw, h: vh } = useWindowSize();
   // Responsive breakpoints
   const isMobile = vw <= 480;
-  const isTablet = vw <= 768;
-  const isLaptop = vw <= 1366;
+  const isTablet = vw <= 768 && vw > 480;
+  const isLaptop = vw <= 1366 && vw > 768;
   const isShortScreen = vh < 720;
   const isDesktop = vw > 1366;
 
-  // Card size for player hand — mobile UNCHANGED, tablet/PC increased
-  const handCardSize = isMobile ? "small" : isTablet ? "normal" : isLaptop ? "large" : "xlarge";
-  // Card overlap — adjusted for larger cards on tablet/PC
-  // Positive overlap means cards are spaced out properly, negative means they overlap
-  const handOverlap = isMobile ? -10 : isTablet ? -8 : isLaptop ? -12 : -20;
-  // AI card size
-  const aiCardSize = isMobile ? "small" : (isTablet || isLaptop) ? "large" : "normal";
-  // AI card overlap (vertical for left/right AIs)
-  const aiOverlap = isMobile ? -20 : (isTablet || isLaptop) ? -27 : -32;
-  // UNO button size
-  const unoSize = isMobile ? 62 : isTablet ? 80 : isLaptop ? 88 : 104;
+  let handCardSize = "large";
+  let aiCardSize = "large";
+  let centerCardSize = "large";
+  let handOverlap = -12;
+  let aiOverlap = -27;
+  let sideAiOverlap = -67;
+  let unoSize = 88;
+
+  if (isMobile) {
+    handCardSize = "small";
+    aiCardSize = "small";
+    centerCardSize = "normal";
+    handOverlap = -10;
+    aiOverlap = -12;
+    sideAiOverlap = -35;
+    unoSize = 62;
+  } else if (isTablet || isShortScreen) {
+    handCardSize = "normal";
+    aiCardSize = "normal";
+    centerCardSize = "normal";
+    handOverlap = -8;
+    aiOverlap = -20;
+    sideAiOverlap = -50;
+    unoSize = 80;
+  } else if (isLaptop) {
+    handCardSize = "large";
+    aiCardSize = "large";
+    centerCardSize = "large";
+    handOverlap = -12;
+    aiOverlap = -27;
+    sideAiOverlap = -67;
+    unoSize = 88;
+  } else {
+    handCardSize = "xlarge";
+    aiCardSize = "xlarge";
+    centerCardSize = "xlarge";
+    handOverlap = -20;
+    aiOverlap = -35;
+    sideAiOverlap = -90;
+    unoSize = 104;
+  }
 
   const top = gs.discardPile[gs.discardPile.length - 1] || null;
   const me = gs.players[0];
@@ -1289,6 +1319,20 @@ export default function UnoFlip({ config, onHome }) {
 
   const activeColorHex = COLOR_HEX[gs.chosenColor] || "#00d2ff";
 
+  const getHandWidth = (count) => {
+    if (count <= 0) return 0;
+    const w = handCardSize === "small" ? 50 : handCardSize === "normal" ? 68 : handCardSize === "large" ? 90 : 115;
+    return w + (count - 1) * (w + handOverlap);
+  };
+
+  const scrollHand = (direction) => {
+    if (handScrollRef.current) {
+      const cardWidth = handCardSize === "small" ? 50 : handCardSize === "normal" ? 68 : handCardSize === "large" ? 90 : 115;
+      const step = (cardWidth + handOverlap) * 3; // Scroll 3 cards at a time
+      handScrollRef.current.scrollBy({ left: direction * step, behavior: 'smooth' });
+    }
+  };
+
   // Detect landscape on mobile
   const isLandscapeMobile = vw <= 900 && vw > vh;
 
@@ -1411,8 +1455,8 @@ export default function UnoFlip({ config, onHome }) {
         .player-hand-scroll {
           display: flex;
           overflow-x: auto;
-          overflow-y: visible;
-          padding: 6px 4px 10px 4px;
+          overflow-y: hidden;
+          padding: 25px 4px 10px 4px;
           -webkit-overflow-scrolling: touch;
           scrollbar-width: none;
           flex-direction: row;
@@ -1615,15 +1659,32 @@ export default function UnoFlip({ config, onHome }) {
         const topPlayer = gs.players[topIdx];
         if (!topPlayer) return null;
         const backSide = gs.side === "light" ? "dark" : "light";
-        const aiOverlapValue = isMobile ? -12 : (isTablet || isLaptop) ? -24 : -22;
         return (
           <div style={{ position: "absolute", top: isMobile ? "5%" : "4%", left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
             <div style={{ display: "flex", justifyContent: "center" }}>
-              {topPlayer.hand.map((_, i) => (
-                <div key={i} style={{ marginLeft: i === 0 ? 0 : aiOverlapValue }}>
-                  <UnoCard card={{}} faceDown side={backSide} size={aiCardSize} />
-                </div>
-              ))}
+              {topPlayer.hand.slice(0, 7).map((_, i) => {
+                const isLast = i === 6 && topPlayer.hand.length > 7;
+                return (
+                  <div key={i} style={{ marginLeft: i === 0 ? 0 : aiOverlap }}>
+                    {isLast ? (
+                      <div style={{ position: "relative" }}>
+                        <UnoCard card={{}} faceDown side={backSide} size={aiCardSize} />
+                        <div style={{
+                          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                          background: "rgba(0,0,0,0.7)", borderRadius: "8px",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "#fff", fontWeight: 900, fontSize: "24px",
+                          border: "2px solid rgba(255,255,255,0.4)"
+                        }}>
+                          +{topPlayer.hand.length - 6}
+                        </div>
+                      </div>
+                    ) : (
+                      <UnoCard card={{}} faceDown side={backSide} size={aiCardSize} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, width: "100%", marginTop: 8, color: gs.currentPlayer === topIdx ? "#FFD700" : "rgba(255,255,255,0.4)", fontSize: 14, fontWeight: 700 }}>
               {gs.currentPlayer === topIdx && <span style={{ fontSize: 10, background: "#FFD700", color: "#000", padding: "2px 6px", borderRadius: 6 }}>TURN</span>}
@@ -1636,15 +1697,32 @@ export default function UnoFlip({ config, onHome }) {
 
       {/* Left Player (AI 1) - only for 3+ players */}
       {gs.players[2] && gs.players[1] && (
-        <div style={{ position: "absolute", left: isMobile ? "1%" : "5%", top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
+        <div style={{ position: "absolute", left: isMobile ? "5%" : "5%", top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-            {gs.players[1].hand.map((_, i) => {
+            {gs.players[1].hand.slice(0, 7).map((_, i) => {
               const backSide = gs.side === "light" ? "dark" : "light";
-              const aiOverlapValue = isMobile ? -18 - 17 : (isTablet || isLaptop) ? -67 : -57;
+              const isLast = i === 6 && gs.players[1].hand.length > 7;
               return (
-                <div key={i} style={{ marginTop: i === 0 ? 0 : aiOverlapValue }}>
+                <div key={i} style={{ marginTop: i === 0 ? 0 : sideAiOverlap }}>
                   <div style={{ transform: "rotate(90deg)", transformOrigin: "center" }}>
-                    <UnoCard card={{}} faceDown side={backSide} size={aiCardSize} />
+                    {isLast ? (
+                      <div style={{ position: "relative" }}>
+                        <UnoCard card={{}} faceDown side={backSide} size={aiCardSize} />
+                        <div style={{
+                          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                          background: "rgba(0,0,0,0.7)", borderRadius: "8px",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "#fff", fontWeight: 900, fontSize: "24px",
+                          border: "2px solid rgba(255,255,255,0.4)"
+                        }}>
+                          <span style={{ transform: "rotate(-90deg)" }}>
+                            +{gs.players[1].hand.length - 6}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <UnoCard card={{}} faceDown side={backSide} size={aiCardSize} />
+                    )}
                   </div>
                 </div>
               );
@@ -1660,15 +1738,32 @@ export default function UnoFlip({ config, onHome }) {
 
       {/* Right Player (AI 3 / Player 4) - only for 4 players */}
       {gs.players[3] && (
-        <div style={{ position: "absolute", right: isMobile ? "1%" : "5%", top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
+        <div style={{ position: "absolute", right: isMobile ? "5%" : "5%", top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 20 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-            {gs.players[3].hand.map((_, i) => {
+            {gs.players[3].hand.slice(0, 7).map((_, i) => {
               const backSide = gs.side === "light" ? "dark" : "light";
-              const aiOverlapValue = isMobile ? -18 - 17 : (isTablet || isLaptop) ? -67 : -57;
+              const isLast = i === 6 && gs.players[3].hand.length > 7;
               return (
-                <div key={i} style={{ marginTop: i === 0 ? 0 : aiOverlapValue }}>
+                <div key={i} style={{ marginTop: i === 0 ? 0 : sideAiOverlap }}>
                   <div style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}>
-                    <UnoCard card={{}} faceDown side={backSide} size={aiCardSize} />
+                    {isLast ? (
+                      <div style={{ position: "relative" }}>
+                        <UnoCard card={{}} faceDown side={backSide} size={aiCardSize} />
+                        <div style={{
+                          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                          background: "rgba(0,0,0,0.7)", borderRadius: "8px",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "#fff", fontWeight: 900, fontSize: "24px",
+                          border: "2px solid rgba(255,255,255,0.4)"
+                        }}>
+                          <span style={{ transform: "rotate(90deg)" }}>
+                            +{gs.players[3].hand.length - 6}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <UnoCard card={{}} faceDown side={backSide} size={aiCardSize} />
+                    )}
                   </div>
                 </div>
               );
@@ -1711,7 +1806,7 @@ export default function UnoFlip({ config, onHome }) {
               card={{ display: gs.drawPile.length }}
               faceDown
               side={gs.side === "light" ? "dark" : "light"}
-              size={isMobile ? "normal" : "large"}
+              size={centerCardSize}
             />
             {isMyTurn && !drewCard && !drawHandAnim && (
               <div style={{ position: "absolute", bottom: -22, left: "50%", transform: "translateX(-50%)", fontSize: 11, fontWeight: 700, color: "#00d2ff", whiteSpace: "nowrap", textShadow: "0 0 6px #00d2ff" }}>TAP TO DRAW</div>
@@ -1723,7 +1818,7 @@ export default function UnoFlip({ config, onHome }) {
           <div style={{ position: "relative" }}>
             {top ? (
               <div style={{ transform: flipAnim ? "rotateY(90deg)" : "rotateY(0)", transition: "transform 0.4s" }}>
-                <UnoCard card={top} size={isMobile ? "normal" : "large"} chosenColor={gs.chosenColor} />
+                <UnoCard card={top} size={centerCardSize} chosenColor={gs.chosenColor} />
               </div>
             ) : (
               <div style={{ width: isMobile ? 60 : 80, height: isMobile ? 90 : 120, borderRadius: 8, border: "2px dashed rgba(255,255,255,0.3)" }} />
@@ -1840,8 +1935,22 @@ export default function UnoFlip({ config, onHome }) {
 
         {/* Hand row + UNO button side by side */}
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 14 }}>
+          {/* Left Arrow */}
+          {me.hand.length > 7 && (
+            <button 
+              onClick={() => scrollHand(-1)} 
+              style={{ padding: "10px", background: "rgba(0,0,0,0.5)", border: "2px solid #fff", color: "#fff", borderRadius: "50%", cursor: "pointer", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              ◀
+            </button>
+          )}
+
           {/* Hand — scrollable */}
-          <div ref={handScrollRef} className="player-hand-scroll" style={{ justifyContent: "flex-start", maxWidth: isMobile ? "75vw" : isTablet ? "72vw" : isLaptop ? "70vw" : "78vw" }}>
+          <div ref={handScrollRef} className="player-hand-scroll" style={{ 
+            justifyContent: me.hand.length < 7 ? "center" : "flex-start", 
+            width: me.hand.length >= 7 ? `${getHandWidth(7) + 20}px` : "auto",
+            maxWidth: isMobile ? "75vw" : isTablet ? "72vw" : isLaptop ? "70vw" : "78vw"
+          }}>
             {me.hand.map((card, i) => {
               const canPlayAny = isMyTurn && !drewCard && !justDrew;
               const isThisDrawn = drewCard && drewCard.id === card.id;
@@ -1861,6 +1970,16 @@ export default function UnoFlip({ config, onHome }) {
               );
             })}
           </div>
+
+          {/* Right Arrow */}
+          {me.hand.length > 7 && (
+            <button 
+              onClick={() => scrollHand(1)} 
+              style={{ padding: "10px", background: "rgba(0,0,0,0.5)", border: "2px solid #fff", color: "#fff", borderRadius: "50%", cursor: "pointer", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              ▶
+            </button>
+          )}
 
           {/* UNO Button + PASS — stacked to the right of the hand */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, flexShrink: 0 }}>
