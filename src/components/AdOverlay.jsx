@@ -16,11 +16,11 @@ export default function AdOverlay() {
                 window.innerWidth < 768;
 
             const params = new URLSearchParams(window.location.search);
-            const isExplicitlyDisabled = params.get('mobile') === 'true' || params.get('desktop') === 'false';
+            const isExplicitlyDisabled = params.get('mobile') === 'false' || params.get('desktop') === 'false';
 
             if (isExplicitlyDisabled) {
                 console.log(
-                    '%c[Ads] Suppressed — Ads explicitly disabled via URL parameter (?mobile=true or ?desktop=false).',
+                    '%c[Ads] Suppressed — Ads explicitly disabled via URL parameter (?mobile=false or ?desktop=false).',
                     'color: #ff4a4a; font-weight: bold;'
                 );
                 return;
