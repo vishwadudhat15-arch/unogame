@@ -1334,37 +1334,7 @@ export default function UnoFlip({ config, onHome }) {
   };
 
   // Detect landscape on mobile
-  const isLandscapeMobile = vw <= 900 && vw > vh;
-
-  if (isLandscapeMobile) {
-    return (
-      <div style={{
-        height: "100dvh", width: "100vw", position: "relative", overflow: "hidden",
-        backgroundColor: "#1a0a2e",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        gap: 20,
-      }}>
-        <div style={{ position: "absolute", inset: "-20px", backgroundImage: `url(${bgImage})`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(10px)", zIndex: 0, opacity: 0.4 }} />
-        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1 }} />
-        <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "20px 30px", background: "rgba(20,10,40,0.9)", borderRadius: 20, border: "2px solid rgba(243,156,18,0.6)", boxShadow: "0 0 40px rgba(243,156,18,0.2)", maxWidth: "80vw", textAlign: "center" }}>
-          <div style={{ fontSize: 56, animation: "rotatePhone 1.5s ease-in-out infinite" }}>📱</div>
-          <div style={{ color: "#f39c12", fontSize: 20, fontWeight: 900, letterSpacing: 2, textTransform: "uppercase" }}>Rotate Your Device</div>
-          <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 14, lineHeight: 1.6, fontWeight: 500 }}>
-            This game is best played in <strong style={{ color: "#fff" }}>portrait mode</strong>.<br />
-            Please rotate your phone to continue.
-          </div>
-        </div>
-        <style>{`
-          @keyframes rotatePhone {
-            0%, 100% { transform: rotate(0deg); }
-            30% { transform: rotate(-90deg); }
-            60% { transform: rotate(-90deg); }
-            80% { transform: rotate(0deg); }
-          }
-        `}</style>
-      </div>
-    );
-  }
+  // (Handled globally in App.jsx now to block landscape globally)
 
   return (
     <div style={{
