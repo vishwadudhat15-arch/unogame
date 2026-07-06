@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import bgImage from "./bg1.png";
+import {
+  soundForCard, soundCardDraw, soundUno, soundColorPick,
+  soundShuffle, soundWin, isMuted, toggleMute
+} from "../data/soundManager";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLORS_LIGHT = ["red", "blue", "green", "yellow"];
@@ -1165,6 +1169,7 @@ export default function UnoFlip({ config, onHome }) {
     if (!isMyTurn && !(drewCard && drewCard.id === cardId)) return;
     const card = me.hand.find(c => c.id === cardId);
     if (!card) return;
+    soundForCard(card); // 🔊 play card sound
     // Trigger play animation before applying state
     setPlayAnim({ card });
     setDrewCard(null);
@@ -1202,6 +1207,7 @@ export default function UnoFlip({ config, onHome }) {
     // Mark this as a voluntary draw so penaltyAnim useEffect skips it
     voluntaryDrawRef.current = true;
 
+    soundCardDraw(); // 🔊 draw sound
     // Always show the fly-to-hand animation
     setAnimCard(drew);
     setDrawHandAnim(true);
@@ -1288,10 +1294,12 @@ export default function UnoFlip({ config, onHome }) {
   }
 
   function handleColorPick(color) {
+    soundColorPick(); // 🔊 color pick sound
     setGs(s => chooseColorAction(s, color));
   }
 
   function handleSayUno() {
+    soundUno(); // 🔊 UNO sound
     setGs(s => {
       const isPending = s.pendingUno === 0;
       const hasTwo = s.players[0].hand.length === 2;
@@ -1307,14 +1315,32 @@ export default function UnoFlip({ config, onHome }) {
   }
 
   function newRound() {
+    soundShuffle(); // 🔊 shuffle sound
     const scores = gs.players.map(p => p.score);
     setGs(initGame(scores, gs.players.length));
     setDrewCard(null);
+    if (typeof window !== 'undefined') {
+      if (typeof window.logAnalyticsEvent === 'function') {
+        window.logAnalyticsEvent('level_start', { level_index: 'next_round' });
+      }
+      if (typeof window.show_initial_ad === 'function') {
+        window.show_initial_ad();
+      }
+    }
   }
 
   function newGame() {
+    soundShuffle(); // 🔊 shuffle sound
     setGs(initGame(null, gs.players.length));
     setDrewCard(null);
+    if (typeof window !== 'undefined') {
+      if (typeof window.logAnalyticsEvent === 'function') {
+        window.logAnalyticsEvent('level_start', { level_index: 'restart' });
+      }
+      if (typeof window.show_initial_ad === 'function') {
+        window.show_initial_ad();
+      }
+    }
   }
 
   const activeColorHex = COLOR_HEX[gs.chosenColor] || "#00d2ff";

@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import HomePage from './components/HomePage';
 import UnoFlip from './components/UnoCard';
 import bgImage from './components/bg1.png';
+import AdOverlay from './components/AdOverlay';
+import { logAnalyticsEvent } from './data/adEventManager';
+import { isMuted, toggleMute } from './data/soundManager';
+
+if (typeof window !== 'undefined') {
+  window.logAnalyticsEvent = logAnalyticsEvent;
+}
 
 const useWindowSize = () => {
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
@@ -28,6 +35,7 @@ const App = () => {
   const [gameState, setGameState] = useState('menu'); // menu, playing
   const [gameMode, setGameMode] = useState(null);
   const [gameConfig, setGameConfig] = useState(null);
+  const [muted, setMutedState] = useState(isMuted());
 
   const { w: vw, h: vh } = useWindowSize();
   const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -43,6 +51,11 @@ const App = () => {
     setGameState('menu');
     setGameMode(null);
     setGameConfig(null);
+  };
+
+  const handleToggleMute = () => {
+    const nowMuted = toggleMute();
+    setMutedState(nowMuted);
   };
 
   if (isLandscapeMobile) {
@@ -77,6 +90,31 @@ const App = () => {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--base-100)', color: 'white', position: 'relative', overflow: 'hidden' }}>
+      
+      {/* Sound Mute/Unmute Overlay Button */}
+      <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 100 }}>
+        <button
+          onClick={handleToggleMute}
+          className="btn btn-outline"
+          style={{ 
+            padding: '0.5rem', 
+            borderRadius: '50%', 
+            background: 'rgba(0,0,0,0.5)', 
+            width: '40px', 
+            height: '40px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            color: '#fff', 
+            border: '1px solid rgba(255,255,255,0.2)',
+            cursor: 'pointer'
+          }}
+          title={muted ? "Unmute" : "Mute"}
+        >
+          {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+        </button>
+      </div>
+
       <AnimatePresence mode="wait">
         {gameState === 'menu' ? (
           <motion.div
@@ -112,6 +150,7 @@ const App = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      <AdOverlay />
     </div>
   );
 };
